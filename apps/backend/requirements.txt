@@ -8,9 +8,9 @@ uvicorn==0.34.0
 celery==5.4.0
 redis==5.2.1
 ccxt==4.4.48
-cryptography==46.0.5
+cryptography==46.0.7
 pydantic==2.10.6
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 prisma==0.13.1
 psycopg2-binary==2.9.9
 tenacity==8.2.3
@@ -27,7 +27,7 @@ google-auth-httplib2==0.2.0
 python-telegram-bot==21.10
 # Phase 4: PromptPay and QR codes
 qrcode==8.0
-pillow==12.1.1
+pillow==12.2.0
 # Phase 4: Plugin system
 pluggy==1.6.0
 importlib-metadata==7.1.0
@@ -44,5 +44,5 @@ psutil==6.1.1
 scikit-learn==1.6.1
 scipy==1.15.1
 # Google Drive integration and YAML config
-gdown==5.2.0
+gdown==5.2.2
 pyyaml==6.0.2
