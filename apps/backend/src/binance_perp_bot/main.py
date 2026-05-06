@@ -36,22 +36,23 @@ async def run() -> None:
         config=config,
         stream=stream,
         factory=StrategyFactory(),
-        position_manager=PositionManager(AllocationConfig(), config.max_correlation),
+        position_manager=PositionManager(
+            AllocationConfig(),
+            config.max_correlation,
+            max_positions=config.max_positions,
+            max_margin_ratio=config.max_margin_ratio,
+        ),
         regime_detector=ADXRegimeDetector(),
         trade_gate=XGBoostTradeGate(config.ml_model_path),
         journal=journal,
     )
     dispatcher.handler = engine.on_snapshot
-    tasks = [
-        asyncio.create_task(stream.stream_symbol(symbol, timeframe))
-        for symbol in config.symbols
-        for timeframe in ("1m", "5m", "4h", "1d", "1w")
-    ]
     try:
-        await asyncio.gather(*tasks)
+        async with asyncio.TaskGroup() as task_group:
+            for symbol in config.symbols:
+                for timeframe in ("1m", "5m", "4h", "1d", "1w"):
+                    task_group.create_task(stream.stream_symbol(symbol, timeframe))
     finally:
-        for task in tasks:
-            task.cancel()
         await stream.close()
 
 

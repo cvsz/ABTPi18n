@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import defaultdict
+from dataclasses import dataclass
+from enum import Enum
 from typing import Protocol
 
 import numpy as np
@@ -21,25 +24,65 @@ class AllocationConfigLike(Protocol):
     position: float
 
 
+class RiskRejectionReason(str, Enum):
+    MAX_POSITIONS = "max_positions"
+    MARGIN_RATIO = "margin_ratio"
+    CORRELATION = "correlation"
+    CONFLICT = "conflict"
+    ALLOCATION = "allocation"
+
+
+@dataclass(frozen=True)
+class PortfolioSnapshot:
+    equity_usdt: float
+    reserved_usdt: float
+    used_margin_usdt: float
+    open_positions: tuple[OpenPosition, ...]
+    strategy_heatmap: dict[StrategyKind, float]
+    margin_ratio: float
+
+
 class PositionManager:
+    """Single source of truth for capital, position state, and risk admission.
+
+    The manager intentionally keeps reservation, correlation, conflict, and commit
+    checks under one asyncio lock. That makes signal-to-order admission atomic
+    across concurrent timeframe workers and prevents double-spending shared USDT
+    equity while WebSocket tasks are yielding control.
+    """
+
     def __init__(
-        self, allocation: AllocationConfigLike, max_correlation: float
+        self,
+        allocation: AllocationConfigLike,
+        max_correlation: float,
+        *,
+        max_positions: int = 30,
+        max_margin_ratio: float = 0.80,
     ) -> None:
         self._allocation = allocation
         self._max_correlation = max_correlation
+        self._max_positions = max_positions
+        self._max_margin_ratio = max_margin_ratio
         self._equity_usdt = 0.0
         self._reserved_usdt = 0.0
         self._positions: dict[str, OpenPosition] = {}
         self._return_history: dict[str, np.ndarray] = {}
         self._lock = asyncio.Lock()
+        self._last_rejection: RiskRejectionReason | None = None
+        self.logger = logging.getLogger(__name__)
+
+    @property
+    def last_rejection(self) -> RiskRejectionReason | None:
+        return self._last_rejection
 
     async def update_equity(self, equity_usdt: float) -> None:
         async with self._lock:
-            self._equity_usdt = equity_usdt
+            self._equity_usdt = max(0.0, equity_usdt)
 
     async def set_return_history(self, symbol: str, returns: np.ndarray) -> None:
+        bounded = np.asarray(returns, dtype=float)[-500:]
         async with self._lock:
-            self._return_history[symbol] = returns
+            self._return_history[symbol] = bounded[np.isfinite(bounded)]
 
     async def reserve(
         self, signal: TradeSignal, price: float, leverage: int
@@ -47,8 +90,16 @@ class PositionManager:
         if signal.action not in {SignalAction.ENTER_LONG, SignalAction.ENTER_SHORT}:
             return None
         async with self._lock:
-            if self._portfolio_correlation(signal.symbol) > self._max_correlation:
-                return None
+            self._last_rejection = None
+            if len(self._positions) >= self._max_positions:
+                return self._reject_locked(signal, RiskRejectionReason.MAX_POSITIONS)
+            if self._has_strategy_conflict_locked(signal):
+                return self._reject_locked(signal, RiskRejectionReason.CONFLICT)
+            correlation = self._portfolio_correlation_locked(signal.symbol)
+            if correlation > self._max_correlation:
+                signal.metadata["portfolio_correlation"] = correlation
+                return self._reject_locked(signal, RiskRejectionReason.CORRELATION)
+
             heatmap = self._heatmap_locked()
             allocation_cap = (
                 self._equity_usdt
@@ -60,15 +111,31 @@ class PositionManager:
                 for p in self._positions.values()
                 if p.strategy == signal.strategy
             )
+            remaining_equity = self._equity_usdt - self._reserved_usdt
+            remaining_margin_capacity = max(
+                0.0, self._equity_usdt * self._max_margin_ratio - self.used_margin_usdt
+            )
             available = min(
-                self._equity_usdt - self._reserved_usdt, allocation_cap - used
+                remaining_equity, allocation_cap - used, remaining_margin_capacity
             )
             notional = min(signal.size_usdt, max(0.0, available))
             if notional <= 0:
-                return None
+                reason = (
+                    RiskRejectionReason.MARGIN_RATIO
+                    if remaining_margin_capacity <= 0
+                    else RiskRejectionReason.ALLOCATION
+                )
+                return self._reject_locked(signal, reason)
             self._reserved_usdt += notional
             side = Side.BUY if signal.action == SignalAction.ENTER_LONG else Side.SELL
             amount = notional * leverage / price
+            signal.metadata.update(
+                {
+                    "reserved_notional_usdt": notional,
+                    "strategy_heatmap": heatmap[signal.strategy],
+                    "margin_ratio": self._margin_ratio_locked(),
+                }
+            )
             return PositionIntent(signal, side, amount, notional, leverage)
 
     async def commit_open(self, intent: PositionIntent, fill_price: float) -> None:
@@ -88,9 +155,51 @@ class PositionManager:
             )
             self._reserved_usdt = max(0.0, self._reserved_usdt - intent.notional_usdt)
 
+    async def close_position(self, position_key: str) -> OpenPosition | None:
+        async with self._lock:
+            return self._positions.pop(position_key, None)
+
     async def release(self, intent: PositionIntent) -> None:
         async with self._lock:
             self._reserved_usdt = max(0.0, self._reserved_usdt - intent.notional_usdt)
+
+    async def snapshot(self) -> PortfolioSnapshot:
+        async with self._lock:
+            return PortfolioSnapshot(
+                equity_usdt=self._equity_usdt,
+                reserved_usdt=self._reserved_usdt,
+                used_margin_usdt=self.used_margin_usdt,
+                open_positions=tuple(self._positions.values()),
+                strategy_heatmap=self._heatmap_locked(),
+                margin_ratio=self._margin_ratio_locked(),
+            )
+
+    @property
+    def used_margin_usdt(self) -> float:
+        return (
+            sum(position.notional_usdt for position in self._positions.values())
+            + self._reserved_usdt
+        )
+
+    @property
+    def current_exposure_usdt(self) -> float:
+        return sum(position.notional_usdt for position in self._positions.values())
+
+    def _reject_locked(
+        self, signal: TradeSignal, reason: RiskRejectionReason
+    ) -> PositionIntent | None:
+        self._last_rejection = reason
+        signal.metadata["risk_rejection_reason"] = reason.value
+        self.logger.info(
+            "risk_rejected",
+            extra={
+                "trace_id": signal.trace_id,
+                "symbol": signal.symbol,
+                "strategy": signal.strategy.value,
+                "reason": reason.value,
+            },
+        )
+        return None
 
     def _target_allocation(self, strategy: StrategyKind) -> float:
         return {
@@ -114,16 +223,51 @@ class PositionManager:
             for kind in StrategyKind
         }
 
-    def _portfolio_correlation(self, symbol: str) -> float:
+    def _portfolio_correlation_locked(self, symbol: str) -> float:
         incoming = self._return_history.get(symbol)
         if incoming is None or incoming.size < 20 or not self._positions:
             return 0.0
         correlations = []
         for position in self._positions.values():
             existing = self._return_history.get(position.symbol)
-            if existing is None or existing.size != incoming.size:
+            if existing is None:
                 continue
-            corr = np.corrcoef(incoming, existing)[0, 1]
+            length = min(incoming.size, existing.size)
+            if length < 20:
+                continue
+            left = incoming[-length:]
+            right = existing[-length:]
+            mask = np.isfinite(left) & np.isfinite(right)
+            if mask.sum() < 20:
+                continue
+            corr = np.corrcoef(left[mask], right[mask])[0, 1]
             if np.isfinite(corr):
                 correlations.append(abs(float(corr)))
         return max(correlations, default=0.0)
+
+    def _has_strategy_conflict_locked(self, signal: TradeSignal) -> bool:
+        incoming_side = (
+            Side.BUY if signal.action == SignalAction.ENTER_LONG else Side.SELL
+        )
+        for position in self._positions.values():
+            if position.symbol != signal.symbol or position.side == incoming_side:
+                continue
+            # Long-horizon position trades are authoritative. Shorter-horizon
+            # scalp/swing signals must not unwind them by opening the opposite side.
+            if (
+                position.strategy == StrategyKind.POSITION
+                or signal.strategy != StrategyKind.POSITION
+            ):
+                signal.metadata.update(
+                    {
+                        "conflicting_strategy": position.strategy.value,
+                        "conflicting_side": position.side.value,
+                    }
+                )
+                return True
+        return False
+
+    def _margin_ratio_locked(self) -> float:
+        if self._equity_usdt <= 0:
+            return 0.0
+        return self.used_margin_usdt / self._equity_usdt

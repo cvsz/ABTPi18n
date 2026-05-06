@@ -16,6 +16,8 @@ class BotConfig(BaseSettings):
     )
     fixed_notional_usdt: float = Field(default=100.0, gt=0)
     max_correlation: float = Field(default=0.65, gt=0, lt=1)
+    max_positions: int = Field(default=30, ge=1, le=200)
+    max_margin_ratio: float = Field(default=0.80, gt=0, le=1)
     websocket_timeout_seconds: float = Field(default=30.0, gt=0)
     heartbeat_interval_seconds: float = Field(default=15.0, gt=0)
     max_reconnect_backoff_seconds: float = Field(default=60.0, gt=1)
