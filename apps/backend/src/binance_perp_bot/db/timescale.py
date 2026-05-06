@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import psycopg2
-from psycopg2.extras import Json
-
 from binance_perp_bot.models import MarketSnapshot, TradeSignal
+from psycopg2 import errors
+from psycopg2.extras import Json
 
 
 class TimescaleJournal:
@@ -21,7 +21,9 @@ class TimescaleJournal:
     async def write_ohlcv(self, snapshot: MarketSnapshot) -> None:
         await asyncio.to_thread(self._write_ohlcv_sync, snapshot)
 
-    async def write_signal(self, signal: TradeSignal, status: str, payload: dict[str, Any]) -> None:
+    async def write_signal(
+        self, signal: TradeSignal, status: str, payload: dict[str, Any]
+    ) -> None:
         await asyncio.to_thread(self._write_signal_sync, signal, status, payload)
 
     def _connect(self):
@@ -29,7 +31,12 @@ class TimescaleJournal:
 
     def _migrate_sync(self) -> None:
         with self._connect() as conn, conn.cursor() as cur:
-            cur.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE")
+            timescale_enabled = True
+            try:
+                cur.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE")
+            except (errors.InsufficientPrivilege, errors.UndefinedFile):
+                conn.rollback()
+                timescale_enabled = False
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS ohlcv (
@@ -45,7 +52,10 @@ class TimescaleJournal:
                 )
                 """
             )
-            cur.execute("SELECT create_hypertable('ohlcv', 'time', if_not_exists => TRUE)")
+            if timescale_enabled:
+                cur.execute(
+                    "SELECT create_hypertable('ohlcv', 'time', if_not_exists => TRUE)"
+                )
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS trade_journal (
@@ -59,14 +69,20 @@ class TimescaleJournal:
                 )
                 """
             )
-            cur.execute("SELECT create_hypertable('trade_journal', 'time', if_not_exists => TRUE)")
+            if timescale_enabled:
+                cur.execute(
+                    "SELECT create_hypertable("
+                    "'trade_journal', 'time', if_not_exists => TRUE)"
+                )
 
     def _write_ohlcv_sync(self, snapshot: MarketSnapshot) -> None:
         rows = self._rows(snapshot)
         with self._connect() as conn, conn.cursor() as cur:
             cur.executemany(
                 """
-                INSERT INTO ohlcv (time, symbol, timeframe, open, high, low, close, volume)
+                INSERT INTO ohlcv (
+                    time, symbol, timeframe, open, high, low, close, volume
+                )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (time, symbol, timeframe) DO UPDATE SET
                     open = EXCLUDED.open, high = EXCLUDED.high, low = EXCLUDED.low,
@@ -75,14 +91,25 @@ class TimescaleJournal:
                 rows,
             )
 
-    def _write_signal_sync(self, signal: TradeSignal, status: str, payload: dict[str, Any]) -> None:
+    def _write_signal_sync(
+        self, signal: TradeSignal, status: str, payload: dict[str, Any]
+    ) -> None:
         with self._connect() as conn, conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO trade_journal (trace_id, symbol, strategy, action, status, payload)
+                INSERT INTO trade_journal (
+                    trace_id, symbol, strategy, action, status, payload
+                )
                 VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (signal.trace_id, signal.symbol, signal.strategy.value, signal.action.value, status, Json(payload)),
+                (
+                    signal.trace_id,
+                    signal.symbol,
+                    signal.strategy.value,
+                    signal.action.value,
+                    status,
+                    Json(payload),
+                ),
             )
 
     def _rows(self, snapshot: MarketSnapshot) -> Iterable[tuple[Any, ...]]:

@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 import xgboost as xgb
-
 from binance_perp_bot.indicators import adx, atr, closes, ema, rsi
 from binance_perp_bot.models import MarketSnapshot, TradeSignal
 

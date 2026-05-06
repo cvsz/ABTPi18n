@@ -42,7 +42,11 @@ async def run() -> None:
         journal=journal,
     )
     dispatcher.handler = engine.on_snapshot
-    tasks = [asyncio.create_task(stream.stream_symbol(symbol, timeframe)) for symbol in config.symbols for timeframe in ("1m", "5m", "4h", "1d", "1w")]
+    tasks = [
+        asyncio.create_task(stream.stream_symbol(symbol, timeframe))
+        for symbol in config.symbols
+        for timeframe in ("1m", "5m", "4h", "1d", "1w")
+    ]
     try:
         await asyncio.gather(*tasks)
     finally:
