@@ -86,11 +86,13 @@ def load_external_strategies(external_dir: str = "strategies/external") -> List[
                     and attr is not Strategy
                     and hasattr(attr, "name")
                 ):
-                    # Register if not already registered (module may have self-registered)
+                    # Register unless module already self-registered.
                     if attr.name not in StrategyRegistry.list_names():
                         StrategyRegistry.register(attr)
                         logger.info(
-                            f"Auto-registered strategy '{attr.name}' from {py_file.name}"
+                            "Auto-registered strategy '%s' from %s",
+                            attr.name,
+                            py_file.name,
                         )
 
         except Exception as e:

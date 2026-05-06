@@ -9,7 +9,7 @@ import io
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from src.services.audit_service import AuditService

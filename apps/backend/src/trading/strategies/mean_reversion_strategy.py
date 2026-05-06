@@ -40,7 +40,7 @@ class MeanReversionStrategy(Strategy):
         self.z_exit = z_exit
         self.last_signal = "HOLD"
 
-    def execute(
+    def execute(  # noqa: C901
         self, ticker_data: Dict[str, Any], context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
@@ -68,7 +68,9 @@ class MeanReversionStrategy(Strategy):
                 "signal": "HOLD",
                 "confidence": 0.0,
                 "meta": {
-                    "reason": f"Insufficient data: need {self.window + 5}, got {len(closes)}"
+                    "reason": (
+                        f"Insufficient data: need {self.window + 5}, got {len(closes)}"
+                    )
                 },
             }
 
@@ -106,7 +108,9 @@ class MeanReversionStrategy(Strategy):
                 "signal": "HOLD",
                 "confidence": 0.0,
                 "meta": {
-                    "reason": "Insufficient historical data for calculation (NaN values)"
+                    "reason": (
+                        "Insufficient historical data for calculation (NaN values)"
+                    )
                 },
             }
 
@@ -128,7 +132,10 @@ class MeanReversionStrategy(Strategy):
         elif abs(current_z) < self.z_exit and self.last_signal in ["BUY", "SELL"]:
             # Price reverted close to mean -> exit position
             signal = "HOLD"
-            reason = f"Mean reversion: Z-score {current_z:.2f} near 0 (exit threshold {self.z_exit})"
+            reason = (
+                f"Mean reversion: Z-score {current_z:.2f} near 0 "
+                f"(exit threshold {self.z_exit})"
+            )
             self.last_signal = "HOLD"
 
         # Update last signal if we have a new entry

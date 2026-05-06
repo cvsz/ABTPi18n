@@ -47,6 +47,7 @@ def check_strategy_logic():
     print("\n=== Testing Strategy Logic ===")
 
     try:
+
         class MockTradingViewStrategy:
             name = "TRADINGVIEW"
 
@@ -92,7 +93,9 @@ def check_strategy_logic():
             context={"symbol": "BTC/USDT"},
         )
         assert result["signal"] == "BUY", f"Expected BUY, got {result['signal']}"
-        assert result["confidence"] == 0.85, f"Expected 0.85, got {result['confidence']}"
+        assert result["confidence"] == 0.85, (
+            f"Expected 0.85, got {result['confidence']}"
+        )
         print("✓ Test 1: Valid BUY signal - PASSED")
 
         result = strategy.execute(
@@ -129,14 +132,19 @@ def check_yaml_config():
     try:
         import yaml
 
-        config_path = Path(__file__).parent.parent / "strategies/external/tradingview_example.yaml"
+        config_path = (
+            Path(__file__).parent.parent
+            / "strategies/external/tradingview_example.yaml"
+        )
 
         with open(config_path, "r") as f:
             config = yaml.safe_load(f)
 
         assert "name" in config, "Missing 'name' field"
         assert "type" in config, "Missing 'type' field"
-        assert config["type"] == "TRADINGVIEW", f"Expected type TRADINGVIEW, got {config['type']}"
+        assert config["type"] == "TRADINGVIEW", (
+            f"Expected type TRADINGVIEW, got {config['type']}"
+        )
 
         print(f"✓ Configuration loaded: {config['name']}")
         print(f"  Type: {config['type']}")
@@ -157,7 +165,9 @@ def check_gdrive_loader_structure():
     print("\n=== Testing Google Drive Loader Structure ===")
 
     try:
-        loader_path = Path(__file__).parent.parent / "apps/backend/src/services/gdrive_loader.py"
+        loader_path = (
+            Path(__file__).parent.parent / "apps/backend/src/services/gdrive_loader.py"
+        )
 
         with open(loader_path, "r") as f:
             content = f.read()
@@ -183,14 +193,19 @@ def check_endpoint_structure():
     print("\n=== Testing Endpoint Structure ===")
 
     try:
-        endpoints_path = Path(__file__).parent.parent / "apps/backend/src/api/tradingview_endpoints.py"
+        endpoints_path = (
+            Path(__file__).parent.parent
+            / "apps/backend/src/api/tradingview_endpoints.py"
+        )
 
         with open(endpoints_path, "r") as f:
             content = f.read()
 
         assert "router = APIRouter()" in content, "Missing router definition"
         assert "async def tradingview_webhook" in content, "Missing webhook endpoint"
-        assert "async def list_tradingview_alerts" in content, "Missing alerts list endpoint"
+        assert "async def list_tradingview_alerts" in content, (
+            "Missing alerts list endpoint"
+        )
         assert "async def get_webhook_config" in content, "Missing config endpoint"
         assert "verify_webhook_secret" in content, "Missing webhook secret verification"
 

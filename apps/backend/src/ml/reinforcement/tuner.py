@@ -205,7 +205,7 @@ class StrategyTuner:
                     else "N/A"
                 ),
                 "totalReturn": (
-                    f"{((optimized_total_return / original_total_return - 1) * 100):.1f}%"
+                    f"{(optimized_total_return / original_total_return - 1) * 100:.1f}%"
                     if original_total_return != 0
                     else "N/A"
                 ),

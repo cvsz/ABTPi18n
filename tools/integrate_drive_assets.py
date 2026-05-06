@@ -195,7 +195,9 @@ def integrate_assets(
 
             # Log action
             action = "Would copy" if dry_run else "Copying"
-            action_line = f"  {action}: {source_file.relative_to(assets_path)} -> {dest_file}"
+            action_line = (
+                f"  {action}: {source_file.relative_to(assets_path)} -> {dest_file}"
+            )
             logger.info(action_line)
 
             if not dry_run:
@@ -210,7 +212,9 @@ def integrate_assets(
                     logger.error(f"  Failed to copy {source_file}: {e}")
 
     logger.info(
-        f"Integration complete: {files_processed} files processed, {files_copied} files copied"
+        "Integration complete: %s files processed, %s files copied",
+        files_processed,
+        files_copied,
     )
 
     return files_processed, files_copied
@@ -225,12 +229,13 @@ def main():
 Examples:
   # Dry run to see what would be done
   python tools/integrate_drive_assets.py --dry-run
-  
+
   # Actually copy files
   python tools/integrate_drive_assets.py
-  
+
   # Use custom paths
-  python tools/integrate_drive_assets.py --assets-dir external/my_assets --map configs/my_map.yaml
+  python tools/integrate_drive_assets.py --assets-dir external/my_assets \
+    --map configs/my_map.yaml
 
 Configuration:
   Edit configs/drive_assets.map.yaml to define mapping rules.

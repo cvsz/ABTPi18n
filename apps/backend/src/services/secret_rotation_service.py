@@ -56,7 +56,8 @@ class SecretRotationService:
         Create a rotation record when a secret is rotated
 
         Args:
-            secret_type: Type of secret (DATABASE, ENCRYPTION_KEY, API_KEY, OAUTH_SECRET)
+            secret_type: Type of secret (DATABASE, ENCRYPTION_KEY, API_KEY,
+                OAUTH_SECRET)
             secret_name: Identifier for the secret
             new_secret_value: New secret value (will be hashed, not stored)
             rotated_by: User ID who performed the rotation

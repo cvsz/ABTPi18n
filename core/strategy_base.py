@@ -29,7 +29,8 @@ class Strategy(ABC):
         Execute strategy logic on ticker data.
 
         Args:
-            ticker_data: Dictionary containing market data (closes, volumes, OHLCV, etc.)
+            ticker_data: Dictionary containing market data (closes, volumes,
+                OHLCV, etc.)
             context: Dictionary with symbol, timeframe, and other metadata
 
         Returns:

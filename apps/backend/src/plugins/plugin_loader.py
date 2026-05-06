@@ -132,7 +132,9 @@ class PluginLoader:
                             }
                         )
                         logger.info(
-                            f"Discovered plugin: {plugin_class.name} v{plugin_class.version}"
+                            "Discovered plugin: %s v%s",
+                            plugin_class.name,
+                            plugin_class.version,
                         )
                     except Exception as e:
                         logger.error(
