@@ -45,7 +45,9 @@ def atr(ohlcv: list[list[float]], period: int = 14) -> float:
     low = lows(ohlcv)
     close = closes(ohlcv)
     previous_close = np.roll(close, 1)
-    true_range = np.maximum(high - low, np.maximum(abs(high - previous_close), abs(low - previous_close)))[1:]
+    true_range = np.maximum(
+        high - low, np.maximum(abs(high - previous_close), abs(low - previous_close))
+    )[1:]
     return float(true_range[-period:].mean())
 
 
@@ -59,9 +61,20 @@ def adx(ohlcv: list[list[float]], period: int = 14) -> float:
     minus_dm = np.maximum(low[:-1] - low[1:], 0.0)
     plus_dm = np.where(plus_dm > minus_dm, plus_dm, 0.0)
     minus_dm = np.where(minus_dm > plus_dm, minus_dm, 0.0)
-    tr = np.maximum(high[1:] - low[1:], np.maximum(abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])))
+    tr = np.maximum(
+        high[1:] - low[1:],
+        np.maximum(abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])),
+    )
     atr_series = np.convolve(tr, np.ones(period) / period, mode="valid")
-    plus_di = 100 * np.convolve(plus_dm, np.ones(period) / period, mode="valid") / np.maximum(atr_series, 1e-9)
-    minus_di = 100 * np.convolve(minus_dm, np.ones(period) / period, mode="valid") / np.maximum(atr_series, 1e-9)
+    plus_di = (
+        100
+        * np.convolve(plus_dm, np.ones(period) / period, mode="valid")
+        / np.maximum(atr_series, 1e-9)
+    )
+    minus_di = (
+        100
+        * np.convolve(minus_dm, np.ones(period) / period, mode="valid")
+        / np.maximum(atr_series, 1e-9)
+    )
     dx = 100 * abs(plus_di - minus_di) / np.maximum(plus_di + minus_di, 1e-9)
     return float(dx[-period:].mean())

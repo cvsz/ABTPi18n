@@ -3,10 +3,20 @@ from __future__ import annotations
 import asyncio
 
 import numpy as np
-
-from binance_perp_bot.models import MarketSnapshot, RegimeMode, SignalAction, StrategyKind, TradeSignal
+from binance_perp_bot.models import (
+    MarketSnapshot,
+    RegimeMode,
+    SignalAction,
+    StrategyKind,
+    TradeSignal,
+)
 from binance_perp_bot.risk.position_manager import PositionManager
-from binance_perp_bot.strategies import BaseStrategy, PositionStrategy, ScalpStrategy, SwingStrategy
+from binance_perp_bot.strategies import (
+    BaseStrategy,
+    PositionStrategy,
+    ScalpStrategy,
+    SwingStrategy,
+)
 
 
 class Allocation:
@@ -16,11 +26,20 @@ class Allocation:
 
 
 def candles(count: int = 250) -> list[list[float]]:
-    return [[i * 60_000, 100 + i * 0.1, 101 + i * 0.1, 99 + i * 0.1, 100 + i * 0.1, 10] for i in range(count)]
+    return [
+        [i * 60_000, 100 + i * 0.1, 101 + i * 0.1, 99 + i * 0.1, 100 + i * 0.1, 10]
+        for i in range(count)
+    ]
 
 
 def snapshot(symbol: str = "BTC/USDT:USDT") -> MarketSnapshot:
-    return MarketSnapshot(symbol=symbol, timeframe="1m", ohlcv=candles(), ticker={"last": 125.0}, orderbook={})
+    return MarketSnapshot(
+        symbol=symbol,
+        timeframe="1m",
+        ohlcv=candles(),
+        ticker={"last": 125.0},
+        orderbook={},
+    )
 
 
 def test_concrete_strategies_implement_base_contract() -> None:
@@ -37,11 +56,25 @@ def test_position_manager_rejects_high_correlation() -> None:
         returns = np.linspace(-0.01, 0.01, 30)
         await manager.set_return_history("BTC/USDT:USDT", returns)
         await manager.set_return_history("ETH/USDT:USDT", returns)
-        signal = TradeSignal("BTC/USDT:USDT", StrategyKind.SCALP, SignalAction.ENTER_LONG, 0.9, 100, RegimeMode.TREND)
+        signal = TradeSignal(
+            "BTC/USDT:USDT",
+            StrategyKind.SCALP,
+            SignalAction.ENTER_LONG,
+            0.9,
+            100,
+            RegimeMode.TREND,
+        )
         first = await manager.reserve(signal, 100, 3)
         assert first is not None
         await manager.commit_open(first, 100)
-        correlated = TradeSignal("ETH/USDT:USDT", StrategyKind.SCALP, SignalAction.ENTER_LONG, 0.9, 100, RegimeMode.TREND)
+        correlated = TradeSignal(
+            "ETH/USDT:USDT",
+            StrategyKind.SCALP,
+            SignalAction.ENTER_LONG,
+            0.9,
+            100,
+            RegimeMode.TREND,
+        )
         assert await manager.reserve(correlated, 100, 3) is None
 
     asyncio.run(scenario())
