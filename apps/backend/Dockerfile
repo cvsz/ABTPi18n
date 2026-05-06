@@ -4,11 +4,11 @@
 # // Author: ZeaZDev Meta-Intelligence (Generated) //
 # // --- DO NOT EDIT HEADER --- //
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
+    PYTHONPATH=/app:/app/src \
     NPM_CONFIG_CACHE=/tmp/npm-cache
 
 WORKDIR /app
@@ -44,5 +44,6 @@ RUN if [ -f "prisma/schema.prisma" ]; then \
         echo "No Prisma schema found, skipping generation"; \
     fi
 
-EXPOSE 8000
+EXPOSE 8000 22022
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
