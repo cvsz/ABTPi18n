@@ -167,9 +167,27 @@ class PositionManager:
                 },
             )
 
+    async def open_position(self, position: Position) -> bool:
+        """Register an already-filled position in the portfolio ledger.
+
+        Returns ``False`` when the manager is already at capacity. The commit path
+        releases the reservation before calling this method, so this check keeps
+        direct callers and post-fill commits consistent.
+        """
+        async with self._lock:
+            if len(self._positions) >= self._max_positions:
+                return False
+            self._positions[position.id] = position
+            return True
+
     async def close_position(self, position_key: str) -> Position | None:
         async with self._lock:
-            return self._positions.pop(position_key, None)
+            if position := self._positions.pop(position_key, None):
+                return position
+            for key, position in tuple(self._positions.items()):
+                if position.symbol == position_key:
+                    return self._positions.pop(key)
+            return None
 
     async def release(self, intent: PositionIntent) -> None:
         async with self._lock:
@@ -189,13 +207,13 @@ class PositionManager:
     @property
     def used_margin_usdt(self) -> float:
         return (
-            sum(position.notional_usdt for position in self._positions.values())
+            sum(position.margin_used for position in self._positions.values())
             + self._reserved_usdt
         )
 
     @property
     def current_exposure_usdt(self) -> float:
-        return sum(position.notional_usdt for position in self._positions.values())
+        return sum(position.margin_used for position in self._positions.values())
 
     def _reject_locked(
         self, signal: TradeSignal, reason: RiskRejectionReason
@@ -264,18 +282,25 @@ class PositionManager:
             Side.BUY if signal.action == SignalAction.ENTER_LONG else Side.SELL
         )
         for position in self._positions.values():
-            if position.symbol != signal.symbol or position.side == incoming_side:
+            if (
+                position.symbol != signal.symbol
+                or position.side == self._position_side(incoming_side)
+            ):
                 continue
             # Long-horizon position trades are authoritative. Shorter-horizon
             # scalp/swing signals must not unwind them by opening the opposite side.
             if (
-                position.strategy == StrategyKind.POSITION
+                position.strategy_kind == StrategyKind.POSITION
                 or signal.strategy != StrategyKind.POSITION
             ):
                 signal.metadata.update(
                     {
-                        "conflicting_strategy": position.strategy.value,
-                        "conflicting_side": position.side.value,
+                        "conflicting_strategy": (
+                            position.strategy_kind.value
+                            if position.strategy_kind
+                            else position.strategy_id
+                        ),
+                        "conflicting_side": position.side.lower(),
                     }
                 )
                 return True
@@ -285,3 +310,7 @@ class PositionManager:
         if self._equity_usdt <= 0:
             return 0.0
         return self.used_margin_usdt / self._equity_usdt
+
+    @staticmethod
+    def _position_side(side: Side) -> str:
+        return "LONG" if side == Side.BUY else "SHORT"
