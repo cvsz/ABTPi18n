@@ -9,13 +9,15 @@ from typing import Protocol
 
 import numpy as np
 from binance_perp_bot.models import (
-    OpenPosition,
+    Position,
     PositionIntent,
+    RegimeMode,
     Side,
     SignalAction,
     StrategyKind,
     TradeSignal,
 )
+from binance_perp_bot.risk.risk_engine import RiskEngine
 
 
 class AllocationConfigLike(Protocol):
@@ -65,7 +67,7 @@ class PositionManager:
         self._max_margin_ratio = max_margin_ratio
         self._equity_usdt = 0.0
         self._reserved_usdt = 0.0
-        self._positions: dict[str, OpenPosition] = {}
+        self._positions: dict[str, Position] = {}
         self._return_history: dict[str, np.ndarray] = {}
         self._lock = asyncio.Lock()
         self._last_rejection: RiskRejectionReason | None = None
@@ -107,9 +109,9 @@ class PositionManager:
                 * heatmap[signal.strategy]
             )
             used = sum(
-                p.notional_usdt
+                p.margin_used
                 for p in self._positions.values()
-                if p.strategy == signal.strategy
+                if p.strategy_kind == signal.strategy
             )
             remaining_equity = self._equity_usdt - self._reserved_usdt
             remaining_margin_capacity = max(
@@ -139,21 +141,32 @@ class PositionManager:
             return PositionIntent(signal, side, amount, notional, leverage)
 
     async def commit_open(self, intent: PositionIntent, fill_price: float) -> None:
+        side = "LONG" if intent.side == Side.BUY else "SHORT"
+        regime = intent.signal.regime
+        position = Position(
+            strategy_id=intent.signal.strategy.value,
+            symbol=intent.signal.symbol,
+            side=side,
+            size=intent.amount,
+            entry_price=fill_price,
+            leverage=intent.leverage,
+            margin_used=intent.notional_usdt,
+            regime_at_open=(
+                regime.value if isinstance(regime, RegimeMode) else str(regime)
+            ),
+            trace_id=intent.signal.trace_id,
+        )
         async with self._lock:
-            key = (
-                f"{intent.signal.strategy}:{intent.signal.symbol}:"
-                f"{intent.signal.trace_id}"
-            )
-            self._positions[key] = OpenPosition(
-                symbol=intent.signal.symbol,
-                strategy=intent.signal.strategy,
-                notional_usdt=intent.notional_usdt,
-                side=intent.side,
-                entry_price=fill_price,
-                amount=intent.amount,
-                trace_id=intent.signal.trace_id,
-            )
             self._reserved_usdt = max(0.0, self._reserved_usdt - intent.notional_usdt)
+        opened = await self.open_position(position)
+        if not opened:
+            self.logger.warning(
+                "position_commit_rejected_after_fill",
+                extra={
+                    "trace_id": intent.signal.trace_id,
+                    "symbol": intent.signal.symbol,
+                },
+            )
 
     async def close_position(self, position_key: str) -> OpenPosition | None:
         async with self._lock:
@@ -211,7 +224,9 @@ class PositionManager:
     def _heatmap_locked(self) -> dict[StrategyKind, float]:
         exposure = defaultdict(float)
         for position in self._positions.values():
-            exposure[position.strategy] += position.notional_usdt
+            kind = position.strategy_kind
+            if kind is not None:
+                exposure[kind] += position.margin_used
         total = sum(exposure.values()) or 1.0
         return {
             kind: max(
