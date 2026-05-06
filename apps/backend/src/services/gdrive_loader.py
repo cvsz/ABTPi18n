@@ -234,7 +234,9 @@ if __name__ == "__main__":
         print(f"\nLoaded {len(strategies)} strategies:")
         for strategy in strategies:
             print(
-                f"  - {strategy.get('name', 'Unnamed')} from {strategy.get('_source_file')}"
+                "  - "
+                f"{strategy.get('name', 'Unnamed')} "
+                f"from {strategy.get('_source_file')}"
             )
     except Exception as e:
         print(f"Error: {str(e)}")

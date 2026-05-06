@@ -19,7 +19,8 @@ class VWAPStrategy(Strategy):
         Volume Weighted Average Price Strategy.
 
         Args:
-            threshold: Percentage deviation from VWAP to trigger signal (e.g., 0.02 = 2%)
+            threshold: Percentage deviation from VWAP to trigger signal
+                (e.g., 0.02 = 2%)
         """
         self.threshold = threshold
         self.last_signal = "HOLD"

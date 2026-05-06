@@ -105,7 +105,10 @@ class TradingViewStrategy(Strategy):
                 "signal": "HOLD",
                 "confidence": confidence,
                 "meta": {
-                    "reason": f"Confidence {confidence:.2f} below minimum {self.min_confidence}",
+                    "reason": (
+                        f"Confidence {confidence:.2f} below minimum "
+                        f"{self.min_confidence}"
+                    ),
                     "original_signal": signal,
                     "tradingview_strategy": strategy_name,
                     "interval": interval,

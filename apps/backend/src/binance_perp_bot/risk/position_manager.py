@@ -17,7 +17,6 @@ from binance_perp_bot.models import (
     StrategyKind,
     TradeSignal,
 )
-from binance_perp_bot.risk.risk_engine import RiskEngine
 
 
 class AllocationConfigLike(Protocol):
@@ -39,7 +38,7 @@ class PortfolioSnapshot:
     equity_usdt: float
     reserved_usdt: float
     used_margin_usdt: float
-    open_positions: tuple[OpenPosition, ...]
+    open_positions: tuple[Position, ...]
     strategy_heatmap: dict[StrategyKind, float]
     margin_ratio: float
 
@@ -168,7 +167,7 @@ class PositionManager:
                 },
             )
 
-    async def close_position(self, position_key: str) -> OpenPosition | None:
+    async def close_position(self, position_key: str) -> Position | None:
         async with self._lock:
             return self._positions.pop(position_key, None)
 

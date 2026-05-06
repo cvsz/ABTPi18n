@@ -51,18 +51,27 @@ async def check_contract_expiry_async():
         contracts_to_check = await rental_service.check_contract_expiry()
 
         for contract in contracts_to_check:
-            proc_msg = f"Processing contract {contract['contract_id']} for user {contract['user_id']}"
+            proc_msg = (
+                f"Processing contract {contract['contract_id']} "
+                f"for user {contract['user_id']}"
+            )
             logger.info(proc_msg)
 
             # Send renewal reminder if needed
             if contract["should_send_reminder"]:
                 days = contract["days_until_expiry"]
-                message = f"Your subscription expires in {days} day(s). Please renew to continue using the service."
+                message = (
+                    f"Your subscription expires in {days} day(s). "
+                    "Please renew to continue using the service."
+                )
 
                 # Send notification (email/telegram)
                 try:
                     # This would send via telegram/email in production
-                    sending_msg = f"Sending renewal reminder to user {contract['user_id']}: {message}"
+                    sending_msg = (
+                        "Sending renewal reminder to user "
+                        f"{contract['user_id']}: {message}"
+                    )
                     logger.info(sending_msg)
                 except Exception as e:
                     logger.error(f"Failed to send renewal reminder: {e}")
@@ -70,16 +79,27 @@ async def check_contract_expiry_async():
             # Disable contract if expired and past grace period
             if contract["should_disable"]:
                 logger.warning(
-                    f"Expiring contract {contract['contract_id']} for user {contract['user_id']}"
+                    "Expiring contract %s for user %s",
+                    contract["contract_id"],
+                    contract["user_id"],
                 )
                 await rental_service.expire_contract(contract["contract_id"])
 
                 # Send expiry notification
-                message = "Your subscription has expired. Your bots have been stopped. Please renew to continue."
-                expiry_msg = f"Sending expiry notification to user {contract['user_id']}: {message}"
+                message = (
+                    "Your subscription has expired. Your bots have been stopped. "
+                    "Please renew to continue."
+                )
+                expiry_msg = (
+                    "Sending expiry notification to user "
+                    f"{contract['user_id']}: {message}"
+                )
                 logger.info(expiry_msg)
 
-        completed_msg = f"Contract expiry check completed. Processed {len(contracts_to_check)} contracts."
+        completed_msg = (
+            "Contract expiry check completed. Processed "
+            f"{len(contracts_to_check)} contracts."
+        )
         logger.info(completed_msg)
 
     except Exception as e:

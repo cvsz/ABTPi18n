@@ -72,7 +72,10 @@ def verify_webhook_secret(
     if not x_webhook_secret:
         raise HTTPException(
             status_code=401,
-            detail="Missing webhook secret. Configure X-Webhook-Secret header in TradingView.",
+            detail=(
+                "Missing webhook secret. Configure X-Webhook-Secret header "
+                "in TradingView."
+            ),
         )
 
     # In production, validate against stored webhook configs
@@ -254,6 +257,8 @@ async def get_webhook_config():
             "supported_actions": ["BUY", "SELL", "CLOSE", "HOLD"],
         },
         "environment_variables": {
-            "TRADINGVIEW_WEBHOOK_SECRET": "Set this in your .env file for webhook authentication"
+            "TRADINGVIEW_WEBHOOK_SECRET": (
+                "Set this in your .env file for webhook authentication"
+            )
         },
     }

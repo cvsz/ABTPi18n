@@ -64,8 +64,8 @@ def main():
             print(f"   Source: {config.get('_source_file', 'N/A')}")
 
             if "symbols" in config:
-                symbols_preview = ", ".join(config['symbols'][:3])
-                if len(config['symbols']) > 3:
+                symbols_preview = ", ".join(config["symbols"][:3])
+                if len(config["symbols"]) > 3:
                     symbols_preview = symbols_preview + "..."
                 print(f"   Symbols: {symbols_preview}")
 
@@ -73,7 +73,9 @@ def main():
                 print(f"   Parameters: {len(config['parameters'])} defined")
 
         print("\n" + "=" * 60)
-        success_msg = f"✓ Successfully loaded {len(configs)} strategies from Google Drive"
+        success_msg = (
+            f"✓ Successfully loaded {len(configs)} strategies from Google Drive"
+        )
         print(success_msg)
 
     except Exception as e:

@@ -16,7 +16,8 @@ class MaxDrawdownTracker:
     def __init__(self, max_drawdown_threshold: float = 0.25):
         """
         Args:
-            max_drawdown_threshold: Maximum allowed drawdown as fraction (e.g., 0.25 = 25%)
+            max_drawdown_threshold: Maximum allowed drawdown as fraction
+                (e.g., 0.25 = 25%)
         """
         self.max_drawdown_threshold = max_drawdown_threshold
         self.peak_equity = 0.0
@@ -192,14 +193,20 @@ class EnhancedRiskManager:
         if self.circuit_breaker.is_tripped():
             return {
                 "allowed": False,
-                "reason": f"Circuit breaker tripped until {self.circuit_breaker.tripped_until}",
+                "reason": (
+                    "Circuit breaker tripped until "
+                    f"{self.circuit_breaker.tripped_until}"
+                ),
             }
 
         # Check trade rate limit
         if self.circuit_breaker.check_trade_rate_limit():
             return {
                 "allowed": False,
-                "reason": f"Trade rate limit exceeded ({self.circuit_breaker.max_trades_per_hour}/hour)",
+                "reason": (
+                    "Trade rate limit exceeded "
+                    f"({self.circuit_breaker.max_trades_per_hour}/hour)"
+                ),
             }
 
         # Update equity from database if available
@@ -210,7 +217,10 @@ class EnhancedRiskManager:
         if self.drawdown_tracker.is_drawdown_exceeded():
             return {
                 "allowed": False,
-                "reason": f"Max drawdown exceeded: {self.drawdown_tracker.get_metrics()['current_drawdown']:.2%}",
+                "reason": (
+                    "Max drawdown exceeded: "
+                    f"{self.drawdown_tracker.get_metrics()['current_drawdown']:.2%}"
+                ),
             }
 
         return {"allowed": True, "reason": "All risk checks passed"}

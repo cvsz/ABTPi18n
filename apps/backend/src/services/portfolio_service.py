@@ -113,7 +113,9 @@ class PortfolioService:
                         # Try to get current price
                         try:
                             ticker_symbol = f"{symbol}/USDT"
-                            ticker = await asyncio.to_thread(exchange.fetch_ticker, ticker_symbol)
+                            ticker = await asyncio.to_thread(
+                                exchange.fetch_ticker, ticker_symbol
+                            )
                             current_price = ticker["last"]
                         except Exception as e:
                             logger.debug(f"Ticker fetch failed for {symbol}: {e}")

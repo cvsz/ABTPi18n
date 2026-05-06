@@ -100,8 +100,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if hasattr(request, "path_params") and request.path_params:
             request_data["path"] = request.path_params
 
-        # Note: We can't easily get the request body here because it's already been consumed
-        # If you need body logging, you'd need to implement a custom Request class
+        # Note: We can't easily get the request body here because it's
+        # already been consumed. If you need body logging, you'd need to
+        # implement a custom Request class
 
         # Log to audit trail (async, non-blocking)
         try:
