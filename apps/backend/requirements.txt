@@ -10,6 +10,7 @@ redis==5.2.1
 ccxt==4.4.48
 cryptography==46.0.5
 pydantic==2.10.6
+pydantic-settings==2.7.1
 python-dotenv==1.0.1
 prisma==0.13.1
 psycopg2-binary==2.9.9
@@ -42,6 +43,7 @@ python-json-logger==3.2.1
 psutil==6.1.1
 # Phase 6: Machine Learning
 scikit-learn==1.6.1
+xgboost==2.1.4
 scipy==1.15.1
 # Google Drive integration and YAML config
 gdown==5.2.0
