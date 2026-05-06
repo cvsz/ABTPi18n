@@ -172,3 +172,29 @@ def test_xgboost_gate_uses_cold_start_when_model_missing(tmp_path) -> None:
     assert gate.allow(snapshot(), signal)
     assert signal.metadata["ml_gate_mode"] == "calibrated_cold_start"
     assert 0 <= signal.metadata["xgb_trade_probability"] <= 1
+
+
+def test_crypto_service_imports_without_encryption_key(monkeypatch) -> None:
+    monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
+
+    from security import crypto_service
+
+    try:
+        crypto_service.encrypt_data("secret")
+    except RuntimeError as exc:
+        assert str(exc) == "ENCRYPTION_KEY not set"
+    else:
+        raise AssertionError("encrypt_data should require ENCRYPTION_KEY at call time")
+
+
+def test_crypto_service_round_trip(monkeypatch) -> None:
+    import base64
+
+    from security import crypto_service
+
+    monkeypatch.setenv("ENCRYPTION_KEY", base64.b64encode(b"1" * 32).decode())
+
+    ciphertext, iv = crypto_service.encrypt_data("secret")
+
+    assert ciphertext != "secret"
+    assert crypto_service.decrypt_data(ciphertext, iv) == "secret"

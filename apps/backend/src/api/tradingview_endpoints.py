@@ -4,21 +4,23 @@
 // Author: ZeaZDev Meta-Intelligence (Generated) //
 // --- DO NOT EDIT HEADER --- //"""
 
+import json
 import os
 from datetime import datetime
 from logging import getLogger
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
-from prisma import Prisma
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 logger = getLogger(__name__)
 
 router = APIRouter()
 
-# Get Prisma instance (should be injected from main app)
-prisma = Prisma()
+# Lazily instantiate Prisma so importing this router does not require a generated
+# Prisma client. Runtime database access still fails clearly if generation has not
+# been completed.
+prisma: Any | None = None
 
 
 class TradingViewAlert(BaseModel):
@@ -52,6 +54,22 @@ class TradingViewWebhookConfig(BaseModel):
     risk_per_trade: Optional[float] = Field(
         default=1.0, description="Risk percentage per trade"
     )
+
+
+def _get_prisma() -> Any:
+    global prisma
+    if prisma is None:
+        from prisma import Prisma
+
+        prisma = Prisma()
+    return prisma
+
+
+def _model_dump(alert: TradingViewAlert) -> dict[str, Any]:
+    """Return a Pydantic v2-compatible dump with a v1 fallback."""
+    if hasattr(alert, "model_dump"):
+        return alert.model_dump()
+    return alert.dict()
 
 
 def verify_webhook_secret(
@@ -117,8 +135,9 @@ async def tradingview_webhook(
     """
     try:
         # Ensure Prisma is connected
-        if not prisma.is_connected():
-            await prisma.connect()
+        client = _get_prisma()
+        if not client.is_connected():
+            await client.connect()
 
         # Normalize action to uppercase
         action = alert.action.upper()
@@ -128,8 +147,11 @@ async def tradingview_webhook(
                 detail=f"Invalid action: {action}. Must be BUY, SELL, CLOSE, or HOLD",
             )
 
-        # Store alert in database for audit trail
-        alert_record = await prisma.tradingviewalert.create(
+        payload = _model_dump(alert)
+
+        # Store alert in database for audit trail. Field names must match the
+        # Prisma schema's camelCase identifiers, and rawPayload is a string field.
+        alert_record = await client.tradingviewalert.create(
             data={
                 "ticker": alert.ticker,
                 "exchange": alert.exchange,
@@ -137,9 +159,10 @@ async def tradingview_webhook(
                 "price": alert.price,
                 "strategy": alert.strategy or "TRADINGVIEW_ALERT",
                 "interval": alert.interval,
+                "volume": alert.volume,
                 "message": alert.message,
-                "received_at": datetime.utcnow(),
-                "raw_payload": alert.dict(),
+                "receivedAt": datetime.utcnow(),
+                "rawPayload": json.dumps(payload, default=str),
             }
         )
 
@@ -164,6 +187,8 @@ async def tradingview_webhook(
             "timestamp": datetime.utcnow().isoformat(),
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(
             f"Error processing TradingView alert: {str(e)}",
@@ -171,12 +196,14 @@ async def tradingview_webhook(
         )
         raise HTTPException(
             status_code=500, detail=f"Failed to process alert: {str(e)}"
-        )
+        ) from e
 
 
 @router.get("/alerts")
 async def list_tradingview_alerts(
-    limit: int = 50, ticker: Optional[str] = None, action: Optional[str] = None
+    limit: int = Query(50, ge=1, le=500),
+    ticker: Optional[str] = None,
+    action: Optional[str] = None,
 ):
     """
     List recent TradingView alerts.
@@ -190,8 +217,9 @@ async def list_tradingview_alerts(
         List of TradingView alerts
     """
     try:
-        if not prisma.is_connected():
-            await prisma.connect()
+        client = _get_prisma()
+        if not client.is_connected():
+            await client.connect()
 
         where_clause = {}
         if ticker:
@@ -199,8 +227,8 @@ async def list_tradingview_alerts(
         if action:
             where_clause["action"] = action.upper()
 
-        alerts = await prisma.tradingviewalert.find_many(
-            where=where_clause, order={"received_at": "desc"}, take=limit
+        alerts = await client.tradingviewalert.find_many(
+            where=where_clause, order={"receivedAt": "desc"}, take=limit
         )
 
         return {
@@ -215,7 +243,7 @@ async def list_tradingview_alerts(
                     "interval": alert.interval,
                     "message": alert.message,
                     "received_at": (
-                        alert.received_at.isoformat() if alert.received_at else None
+                        alert.receivedAt.isoformat() if alert.receivedAt else None
                     ),
                 }
                 for alert in alerts
@@ -223,9 +251,13 @@ async def list_tradingview_alerts(
             "count": len(alerts),
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching TradingView alerts: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch alerts: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch alerts: {str(e)}"
+        ) from e
 
 
 @router.get("/config")
