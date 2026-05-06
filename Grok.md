@@ -1,55 +1,3 @@
--   Ctrl+K
-
--   [
-    
-    Chat](https://grok.com/)Ctrl+J
-
--   [
-    
-    Voice](https://grok.com/?voice=true)
-
--   [
-    
-    Imagine](https://grok.com/imagine)
-
-Projects
-
--   New Project
-    
--   [
-    
-    zGaming](https://grok.com/project/e52bad2b-244b-4a43-87c7-a9913daf1551)
-    
-
-History
-
-Today
-
--   [Production-Grade Trading Bot Code Structure](https://grok.com/c/e7215cbb-37d1-442e-ac42-11a8c290dd34)
-    
--   [zVEO AI Media Orchestration Codex Prompts](https://grok.com/c/0d69e647-cbcc-42e3-9602-2b7e47d86195)
-    
-
-Earlier
-
--   [GitHub Actions PDO Access Denied Error](https://grok.com/c/12c46053-5f60-46b5-a6d6-92a258c40c95)
-    
--   [Bash unbound variable error fix](https://grok.com/c/2008af35-2ce1-4d9b-b808-d356a9f9034d)
-    
--   [zeaz.dev v72.4 Stable Build Script](https://grok.com/c/388ec057-7ac8-494c-a7ab-2d2416f64b22)
-    
--   [zLinebot Discussions Guidelines & Config Script](https://grok.com/c/e005e27f-beea-4727-b321-c16660de96d4)
-    
--   [Fixed: pnpm command not found in GitHub Actions](https://grok.com/c/4a959b30-bc96-4fcb-b2eb-194df98e5d30)
-    
--   [GitHub CI/CD Pipeline Errors and Fixes](https://grok.com/c/5cb901ab-11dc-4f38-b8ff-2f0a02e3d22f)
-    
-See all
-
-![pfp](https://assets.grok.com/users/094bbe05-4d90-4e64-8ca6-6c12dca22ee3/623351nTpRbJdU1g-profile-picture.webp)
-
-Share[](https://grok.com/)
-
 นี่คือการ Review และ Refine ตัว Master Prompt ของคุณในฐานะ Senior Quantitative Architect โดยเน้นไปที่การทำให้ AI สามารถนำไปเขียนโค้ดที่ใช้งานได้จริงในระดับ Production-Grade ตามมาตรฐาน "Omega Quality" ที่คุณยึดถือครับ 🔵 Review: จุดแข็งและจุดที่ควรปรับปรุง จุดแข็ง (Strengths):
 
 -   Modular Architecture: การเลือกใช้ Strategy Factory และ BaseStrategy Inherit เป็นแนวทางที่ถูกต้องสำหรับการทำ Scalable System
@@ -2457,9 +2405,3 @@ Thought for 7s
 1.6s
 
 อธิบาย Machine Learning Retrainingแนะนำ Multi-Asset Trading
-
-  
-
-Fast
-
-## Upgrade to SuperGrok
