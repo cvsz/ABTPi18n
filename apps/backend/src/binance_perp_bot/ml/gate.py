@@ -1,18 +1,39 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import numpy as np
 import xgboost as xgb
 from binance_perp_bot.indicators import adx, atr, closes, ema, rsi
-from binance_perp_bot.models import MarketSnapshot, TradeSignal
+from binance_perp_bot.models import (
+    MarketSnapshot,
+    RegimeMode,
+    SignalAction,
+    TradeSignal,
+)
 
 
 class XGBoostTradeGate:
+    """XGBoost binary trade/no-trade gate with deterministic cold-start scoring."""
+
     def __init__(self, model_path: str, threshold: float = 0.55) -> None:
         self.threshold = threshold
-        self.model = xgb.Booster()
-        self.model.load_model(str(Path(model_path)))
+        self.model_path = Path(model_path)
+        self.logger = logging.getLogger(__name__)
+        self.model: xgb.Booster | None = None
+        if self.model_path.exists():
+            self.model = xgb.Booster()
+            self.model.load_model(str(self.model_path))
+        else:
+            self.logger.warning(
+                "xgb_model_missing_using_calibrated_gate",
+                extra={
+                    "trace_id": "ml-gate",
+                    "symbol": "system",
+                    "strategy": "xgboost",
+                },
+            )
 
     def features(self, snapshot: MarketSnapshot, signal: TradeSignal) -> np.ndarray:
         price = closes(snapshot.ohlcv)
@@ -24,16 +45,42 @@ class XGBoostTradeGate:
                 adx(snapshot.ohlcv),
                 rsi(price, 14),
                 (ema(price, 12) - ema(price, 26)) / max(last, 1e-9),
-                float(signal.action.value == "enter_long"),
-                float(signal.regime.value == "trend"),
-                float(signal.regime.value == "mean_reversion"),
+                float(signal.action == SignalAction.ENTER_LONG),
+                float(signal.regime == RegimeMode.TREND),
+                float(signal.regime == RegimeMode.MEAN_REVERSION),
             ],
             dtype=float,
         )
         return feature_row.reshape(1, -1)
 
     def allow(self, snapshot: MarketSnapshot, signal: TradeSignal) -> bool:
-        matrix = xgb.DMatrix(self.features(snapshot, signal))
-        probability = float(self.model.predict(matrix)[0])
+        if self.model is not None:
+            matrix = xgb.DMatrix(self.features(snapshot, signal))
+            probability = float(self.model.predict(matrix)[0])
+            gate_mode = "xgboost"
+        else:
+            probability = self._calibrated_probability(snapshot, signal)
+            gate_mode = "calibrated_cold_start"
+        signal.metadata["ml_gate_mode"] = gate_mode
         signal.metadata["xgb_trade_probability"] = probability
         return probability >= self.threshold
+
+    def _calibrated_probability(
+        self, snapshot: MarketSnapshot, signal: TradeSignal
+    ) -> float:
+        price = closes(snapshot.ohlcv)
+        last = price[-1]
+        volatility = atr(snapshot.ohlcv) / max(last, 1e-9)
+        trend_strength = adx(snapshot.ohlcv) / 100.0
+        momentum = rsi(price, 14)
+        momentum_quality = 1.0 - min(abs(momentum - 55.0), 45.0) / 45.0
+        volatility_penalty = min(volatility / 0.05, 1.0) * 0.20
+        regime_bonus = 0.08 if signal.regime != RegimeMode.HIGH_VOLATILITY else -0.12
+        score = (
+            0.58 * signal.confidence
+            + 0.22 * trend_strength
+            + 0.20 * momentum_quality
+            + regime_bonus
+            - volatility_penalty
+        )
+        return float(max(0.0, min(1.0, score)))
