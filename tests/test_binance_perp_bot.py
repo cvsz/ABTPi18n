@@ -78,3 +78,33 @@ def test_position_manager_rejects_high_correlation() -> None:
         assert await manager.reserve(correlated, 100, 3) is None
 
     asyncio.run(scenario())
+
+
+def test_position_manager_rejects_duplicate_symbol_atomically() -> None:
+    async def scenario() -> None:
+        manager = PositionManager(Allocation(), max_correlation=0.65, max_positions=1)
+        await manager.update_equity(1_000)
+        signal = TradeSignal(
+            "BTC/USDT:USDT",
+            StrategyKind.SCALP,
+            SignalAction.ENTER_LONG,
+            0.9,
+            100,
+            RegimeMode.TREND,
+        )
+        first = await manager.reserve(signal, 100, 3)
+        assert first is not None
+        await manager.commit_open(first, 100)
+
+        duplicate = TradeSignal(
+            "BTC/USDT:USDT",
+            StrategyKind.SWING,
+            SignalAction.ENTER_LONG,
+            0.9,
+            100,
+            RegimeMode.TREND,
+        )
+        assert await manager.reserve(duplicate, 100, 3) is None
+        assert len(await manager.positions()) == 1
+
+    asyncio.run(scenario())
