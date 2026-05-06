@@ -21,6 +21,7 @@ class BotConfig(BaseSettings):
     websocket_timeout_seconds: float = Field(default=30.0, gt=0)
     heartbeat_interval_seconds: float = Field(default=15.0, gt=0)
     max_reconnect_backoff_seconds: float = Field(default=60.0, gt=1)
+    max_candles_per_stream: int = Field(default=500, ge=50, le=5_000)
     internal_port: int = Field(
         default=22022,
         description="Spaceship Standard port for internal comms or SSH tunnels",

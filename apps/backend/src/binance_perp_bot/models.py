@@ -76,6 +76,18 @@ class MarketSnapshot:
     orderbook: dict[str, Any]
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+    def with_bounded_ohlcv(self, max_candles: int) -> "MarketSnapshot":
+        """Return a copy retaining only the latest candles for memory safety."""
+        bounded = self.ohlcv[-max_candles:] if max_candles > 0 else []
+        return MarketSnapshot(
+            symbol=self.symbol,
+            timeframe=self.timeframe,
+            ohlcv=bounded,
+            ticker=self.ticker,
+            orderbook=self.orderbook,
+            timestamp=self.timestamp,
+        )
+
 
 @dataclass
 class TradeSignal:

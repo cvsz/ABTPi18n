@@ -147,3 +147,28 @@ def test_position_manager_enforces_capacity_and_reports_snapshot() -> None:
         assert 0 < portfolio.margin_ratio < 1
 
     asyncio.run(scenario())
+
+
+def test_market_snapshot_bounds_ohlcv_without_mutating_original() -> None:
+    source = snapshot()
+    bounded = source.with_bounded_ohlcv(25)
+    assert len(source.ohlcv) == 250
+    assert len(bounded.ohlcv) == 25
+    assert bounded.ohlcv[0] == source.ohlcv[-25]
+
+
+def test_xgboost_gate_uses_cold_start_when_model_missing(tmp_path) -> None:
+    from binance_perp_bot.ml.gate import XGBoostTradeGate
+
+    gate = XGBoostTradeGate(str(tmp_path / "missing.json"), threshold=0.10)
+    signal = TradeSignal(
+        "BTC/USDT:USDT",
+        StrategyKind.SCALP,
+        SignalAction.ENTER_LONG,
+        0.9,
+        100,
+        RegimeMode.TREND,
+    )
+    assert gate.allow(snapshot(), signal)
+    assert signal.metadata["ml_gate_mode"] == "calibrated_cold_start"
+    assert 0 <= signal.metadata["xgb_trade_probability"] <= 1
