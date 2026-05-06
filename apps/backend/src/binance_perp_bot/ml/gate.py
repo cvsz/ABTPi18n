@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import logging
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-import xgboost as xgb
 from binance_perp_bot.indicators import adx, atr, closes, ema, rsi
 from binance_perp_bot.models import (
     MarketSnapshot,
@@ -21,19 +23,20 @@ class XGBoostTradeGate:
         self.threshold = threshold
         self.model_path = Path(model_path)
         self.logger = logging.getLogger(__name__)
-        self.model: xgb.Booster | None = None
-        if self.model_path.exists():
-            self.model = xgb.Booster()
-            self.model.load_model(str(self.model_path))
-        else:
-            self.logger.warning(
-                "xgb_model_missing_using_calibrated_gate",
-                extra={
-                    "trace_id": "ml-gate",
-                    "symbol": "system",
-                    "strategy": "xgboost",
-                },
-            )
+        self.model: Any | None = None
+        self._xgboost: Any | None = None
+
+        if not self.model_path.exists():
+            self._log_cold_start("xgb_model_missing_using_calibrated_gate")
+            return
+
+        if importlib.util.find_spec("xgboost") is None:
+            self._log_cold_start("xgb_dependency_missing_using_calibrated_gate")
+            return
+
+        self._xgboost = importlib.import_module("xgboost")
+        self.model = self._xgboost.Booster()
+        self.model.load_model(str(self.model_path))
 
     def features(self, snapshot: MarketSnapshot, signal: TradeSignal) -> np.ndarray:
         price = closes(snapshot.ohlcv)
@@ -54,8 +57,8 @@ class XGBoostTradeGate:
         return feature_row.reshape(1, -1)
 
     def allow(self, snapshot: MarketSnapshot, signal: TradeSignal) -> bool:
-        if self.model is not None:
-            matrix = xgb.DMatrix(self.features(snapshot, signal))
+        if self.model is not None and self._xgboost is not None:
+            matrix = self._xgboost.DMatrix(self.features(snapshot, signal))
             probability = float(self.model.predict(matrix)[0])
             gate_mode = "xgboost"
         else:
@@ -64,6 +67,16 @@ class XGBoostTradeGate:
         signal.metadata["ml_gate_mode"] = gate_mode
         signal.metadata["xgb_trade_probability"] = probability
         return probability >= self.threshold
+
+    def _log_cold_start(self, message: str) -> None:
+        self.logger.warning(
+            message,
+            extra={
+                "trace_id": "ml-gate",
+                "symbol": "system",
+                "strategy": "xgboost",
+            },
+        )
 
     def _calibrated_probability(
         self, snapshot: MarketSnapshot, signal: TradeSignal
