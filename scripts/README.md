@@ -89,3 +89,20 @@ When adding new scripts:
 3. Include usage instructions
 4. Update this README with script documentation
 5. Test the script thoroughly before committing
+
+### integrate_ecc_repo.sh
+
+Integrate the Everything-Claude-Code (ECC) repository as a local external dependency.
+
+**Usage:**
+```bash
+./scripts/integrate_ecc_repo.sh
+```
+
+**Environment variables:**
+- `ECC_REPO_URL`: Git URL to clone/pull (default: `git@github.com:cvsz/everything-claude-code.git`)
+- `ECC_TARGET_DIR`: Target directory (default: `external/everything-claude-code`)
+
+**What it does:**
+- Clones ECC into `external/everything-claude-code` when missing
+- Runs `git pull --ff-only` if the repo is already present
