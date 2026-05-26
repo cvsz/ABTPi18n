@@ -20,7 +20,7 @@
     "format:py": "ruff format . && black .",
     "lint:js": "eslint --ext .js,.ts,.tsx . || true",
     "format:js": "prettier --write .",
-    "lint": "pnpm -w -s run lint:js && pnpm -s run lint:py",
+    "lint": "pnpm -s run lint:js && pnpm -s run lint:py",
     "format": "pnpm -w -s run format:js && pnpm -s run format:py",
     "test:py": "pytest -q",
     "test:js": "jest --runInBand"
