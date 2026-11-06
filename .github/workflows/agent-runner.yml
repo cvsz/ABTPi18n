@@ -1,32 +1,31 @@
 # .github/workflows/agent-runner.yml
 name: Omega Copilot Agent Runner
 on:
-workflow_dispatch:
-inputs:
-task:
-description: 'Agent task JSON (see .copilot/prompts)'
-required: true
-pull_request:
-types: [opened, synchronize, reopened]
-
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Agent task JSON (see .copilot/prompts)'
+        required: true
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
-run-agent:
-runs-on: ubuntu-latest
-permissions:
-contents: read
-pull-requests: write
-actions: write
-steps:
-- uses: actions/checkout@v4
-- name: Setup Node
-uses: actions/setup-node@v4
-with:
-node-version: 20
-- name: Run Copilot Agent CLI
-env:
-COPILOT_TOKEN: ${{ secrets.COPILOT_AGENT_TOKEN }}
-run: |
-# production invoker — ensure agent config is present
-test -f .copilot/agent.yml || (echo "Missing agent.yml" && exit 1)
-copilot agents run --manifest .copilot/agent.yml --input "$GITHUB_EVENT_INPUT" --repo $GITHUB_REPOSITORY
+  run-agent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run Copilot Agent CLI
+        env:
+          COPILOT_TOKEN: ${{ secrets.COPILOT_AGENT_TOKEN }}
+        run: |
+          # production invoker — ensure agent config is present
+          test -f .copilot/agent.yml || (echo "Missing agent.yml" && exit 1)
+          copilot agents run --manifest .copilot/agent.yml --input "$GITHUB_EVENT_INPUT" --repo $GITHUB_REPOSITORY
