@@ -107,7 +107,7 @@ jobs:
         run: |
           gh pr review ${{ github.event.pull_request.number }} \
             --approve \
-            --comment "Automated approval by @policedbc — audit passed, no security-sensitive paths changed." \
+            --body "Automated approval by @policedbc — audit passed, no security-sensitive paths changed." \
             --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ secrets.POLIEDBC_PAT }}
@@ -117,7 +117,7 @@ jobs:
         run: |
           gh pr review ${{ github.event.pull_request.number }} \
             --request-changes \
-            --comment "Security-sensitive paths changed. Human review by @policedbc required per CODEOWNERS before merge." \
+            --body "Security-sensitive paths changed. Human review by @policedbc required per CODEOWNERS before merge." \
             --repo ${{ github.repository }}
         env:
           GH_TOKEN: ${{ secrets.POLIEDBC_PAT }}
